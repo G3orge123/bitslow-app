@@ -22,10 +22,10 @@ export function seedDatabase(
 		clearExisting = false,
 	} = options;
 
-	console.log("🌱 Initializing database schema and seeding data...");
+	console.log(" Initializing database schema and seeding data...");
 
 	if (clearExisting) {
-		console.log("🗑️ Clearing existing data...");
+		console.log(" Clearing existing data...");
 		db.exec(`
       DROP TABLE IF EXISTS transactions;
       DROP TABLE IF EXISTS coins;
@@ -41,9 +41,9 @@ export function seedDatabase(
 	const coins = seedCoins(db, bitSlowCount, clients.length);
 	seedTransactions(db, transactionCount, coins.length, clients.length);
 
-	console.log("✅ Database seeding complete!");
+	console.log(" Database seeding complete!");
 	console.log(
-		`📊 Generated ${clientCount} clients, ${bitSlowCount} BitSlows, and ${transactionCount} transactions.`,
+		` Generated ${clientCount} clients, ${bitSlowCount} BitSlows, and ${transactionCount} transactions.`,
 	);
 
 	return {
@@ -57,10 +57,15 @@ export function seedDatabase(
  * Initialize database schema
  */
 function initializeSchema(db: Database) {
-	console.log("📝 Creating tables if they don't exist...");
+	console.log(" Creating tables if they don't exist...");
 
 	db.exec(`
     -- Create clients table
+	CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS clients (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -101,7 +106,7 @@ function initializeSchema(db: Database) {
  * Generate random clients
  */
 function seedClients(db: Database, count: number): number[] {
-	console.log(`👤 Generating ${count} random clients...`);
+	console.log(` Generating ${count} random clients...`);
 
 	const clientIds: number[] = [];
 	const insertClient = db.prepare(`
@@ -120,7 +125,8 @@ function seedClients(db: Database, count: number): number[] {
 			const address = faker.location.streetAddress({ useFullAddress: true });
 
 			const info = insertClient.run(name, email, phone, address);
-			clientIds.push(Number(info.lastInsertId));
+			clientIds.push(Number(info.lastInsertRowid));
+
 		}
 	})();
 
@@ -131,7 +137,7 @@ function seedClients(db: Database, count: number): number[] {
  * Generate random BitSlows
  */
 function seedCoins(db: Database, count: number, clientCount: number): number[] {
-	console.log(`💰 Generating ${count} random BitSlows...`);
+	console.log(` Generating ${count} random BitSlows...`);
 
 	const coinIds: number[] = [];
 	const insertCoin = db.prepare(`
@@ -180,7 +186,7 @@ function seedCoins(db: Database, count: number, clientCount: number): number[] {
 			usedValues.add(value);
 
 			const info = insertCoin.run(clientId, bit1, bit2, bit3, value);
-			coinIds.push(Number(info.lastInsertId));
+			coinIds.push(Number(info.lastInsertRowid));
 		}
 	})();
 
@@ -222,7 +228,7 @@ function seedTransactions(
 	coinCount: number,
 	clientCount: number,
 ) {
-	console.log(`💸 Generating ${count} random transactions...`);
+	console.log(` Generating ${count} random transactions...`);
 
 	const insertTransaction = db.prepare(`
     INSERT INTO transactions (coin_id, seller_id, buyer_id, amount, transaction_date) 
@@ -251,9 +257,10 @@ function seedTransactions(
 			} while (buyerId === sellerId);
 
 			// Get BitSlow value
-			const coinValue =
-				db.query("SELECT value FROM coins WHERE coin_id = ?").get(coinId)
-					?.value || 0;
+			
+			const result = db.query("SELECT value FROM coins WHERE coin_id = ?").get(coinId) as { value: number } | undefined;
+			const coinValue = result?.value || 0;
+
 
 			// Use exact BitSlow value as the transaction amount
 			const amount = coinValue;
